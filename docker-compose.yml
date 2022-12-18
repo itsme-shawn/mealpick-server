@@ -1,0 +1,12 @@
+version: "3.7"
+
+services:
+  crawler:
+    image: mealpick-crawler
+    ports:
+      - 8080:8080
+    volumes:
+      - ./crawler:/code/crawler
+    # command: python3 -m crawler.crawler.py
+    tty: true
+    stdin_open : true
