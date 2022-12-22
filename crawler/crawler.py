@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 options = webdriver.ChromeOptions()
@@ -18,7 +20,7 @@ options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("window-size=1920x1080")
 options.add_argument(
-    "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36"
+    "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
 )
 options.add_argument("lang=ko_KR")
 
@@ -26,10 +28,20 @@ driver = webdriver.Chrome(
     service=Service(ChromeDriverManager().install()), options=options
 )
 
+driver.execute_script(
+    "Object.defineProperty(navigator, 'plugins', {get: function() {return[1, 2, 3, 4, 5];},});"
+)
+driver.execute_script(
+    "Object.defineProperty(navigator, 'languages', {get: function() {return ['ko-KR', 'ko']}})"
+)
+driver.execute_script(
+    "const getParameter = WebGLRenderingContext.getParameter;WebGLRenderingContext.prototype.getParameter = function(parameter) {if (parameter === 37445) {return 'NVIDIA Corporation'} if (parameter === 37446) {return 'NVIDIA GeForce GTX 980 Ti OpenGL Engine';}return getParameter(parameter);};"
+)
+
 now = str(datetime.datetime.now())[:-7]
 
-locations = ["신촌", "서강대", "대흥"]
-# locations = ["신촌"]
+# locations = ["신촌", "서강대", "대흥"]
+locations = ["연희동", "연세대", "이대"]
 
 for location in locations:
     url = f"https://map.naver.com/v5/search/{location} 음식점"
@@ -108,6 +120,11 @@ for location in locations:
             }
 
             try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, "span.place_bluelink")
+                    )
+                )
                 name = r.find_element(By.CSS_SELECTOR, "span.place_bluelink")
                 # 음식점 클릭 후 iframe 이동
                 name.click()
@@ -264,15 +281,19 @@ for location in locations:
 
                 # 사용자 리뷰 (user_review)
                 try:
-                    review_tab = driver.find_element(
-                        By.CSS_SELECTOR, 'a[href*="review"]'
+                    review_tab = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located(
+                            (By.CSS_SELECTOR, 'a[href*="review"]')
+                        )
                     )
+                    # review_tab = driver.find_element(By.CSS_SELECTOR, 'a[href*="review"]')
                     if review_tab:
                         review_tab.click()
                         time.sleep(3)
-                        review_load_btn = driver.find_element(
-                            By.CSS_SELECTOR, "a.Tvx37"
+                        review_load_btn = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "a.Tvx37"))
                         )
+                        # review_load_btn = driver.find_element(By.CSS_SELECTOR, 'a.Tvx37')
 
                         try:
                             for _ in range(3):
@@ -282,10 +303,12 @@ for location in locations:
                         except Exception as e:
                             print("review_load_btn 예외발생 (큰 문제 아님) : ", e)
 
-                        review_list = driver.find_elements(
-                            By.CSS_SELECTOR, "ul.uNsI9 li.nbD78"
+                        review_list = WebDriverWait(driver, 10).until(
+                            EC.presence_of_all_elements_located(
+                                (By.CSS_SELECTOR, "ul.uNsI9 li.nbD78")
+                            )
                         )
-                        time.sleep(3)
+                        # review_list = driver.find_elements(By.CSS_SELECTOR, 'ul.uNsI9 li.nbD78')
 
                         review_dict = {}
                         for review in review_list:
@@ -317,18 +340,16 @@ for location in locations:
 
                 df = pd.DataFrame(restaurant)
 
-                if not os.path.exists(
-                    f"{os.path.dirname(os.path.realpath(__file__))}/restaurant_{now}.csv"
-                ):
+                if not os.path.exists(f"./restaurant_{now}.csv"):
                     df.to_csv(
-                        f"{os.path.dirname(os.path.realpath(__file__))}/restaurant_{now}.csv",
+                        f"./restaurant_{now}.csv",
                         mode="w",
                         index=False,
                         encoding="utf-8-sig",
                     )
                 else:
                     df.to_csv(
-                        f"{os.path.dirname(os.path.realpath(__file__))}/restaurant_{now}.csv",
+                        f"./restaurant_{now}.csv",
                         mode="a",
                         index=False,
                         header=False,
@@ -345,4 +366,4 @@ for location in locations:
         next_page_btn.click()
         time.sleep(2)
 
-driver.quit()
+driver.close()
